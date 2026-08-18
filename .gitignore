@@ -1,0 +1,15 @@
+# Node / frontend
+Client/node_modules/
+Client/dist/
+Client/.env.local
+
+# Backend
+Server/node_modules/
+Server/.env
+
+# Global env files
+.env
+.env.local
+
+# Logs
+npm-debug.log*
