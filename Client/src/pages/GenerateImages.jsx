@@ -1,5 +1,6 @@
-import { Hash, Image, Sparkle } from 'lucide-react'
+import { Image, Sparkle } from 'lucide-react'
 import React, { useState } from 'react'
+import { useAuth } from '@clerk/react'
 
 const GenerateImages = () => {
 
@@ -58,7 +59,7 @@ const GenerateImages = () => {
         bg-gradient-to-r from-[#00AD25] to-[#8E37EB] text-white px-4 py-2 mt-6 
         text-sm rounded-lg cursor-pointer'>
           <Image className='w-5 '/>
-          Generate Title
+          {loading ? 'Generating...' : 'Generate Image'}
 
         </button>
 
@@ -75,13 +76,14 @@ const GenerateImages = () => {
 
         </div>
         <div className='flex-1 flex justify-center items-center'>
-          <div className='text-sm flex flex-col items-center gap-5 
-          text-gray-400'>
-            <Image className='w-9 h-9 text-[#4A7AFF]'/>
-            <p>Enter topic and click "Generate image" to get started</p>
-
-
-          </div>
+          {image ? (
+            <img src={image} alt={Input} className='max-h-[500px] max-w-full rounded-md object-contain' />
+          ) : (
+            <div className='text-sm flex flex-col items-center gap-5 text-gray-400'>
+              <Image className='w-9 h-9 text-[#4A7AFF]'/>
+              <p>{error || 'Enter a topic and click "Generate image" to get started'}</p>
+            </div>
+          )}
 
         </div>
 

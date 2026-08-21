@@ -1,36 +1,38 @@
 
 import { OpenAI } from "openai/client.js"
-// import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import sql from "../configs/db.js"
 import {v2 as cloudinary} from 'cloudinary'
 import axios from 'axios'
 
-const AI = new OpenAI({
+const AI = new GoogleGenAI({
     apiKey : process.env.GEMINI_API_KEY,
-    baseURL : "https://generativelanguage.googleapis.com/v1beta/openai/"
+    
+    
 })
 
 
 
 export const generateArticle = async (req,res)=>{
     try{
-        const {userId} = req.auth()
+        console.log("GENERATE ARTICLE CONTROLLER REACHED");
+
+        const { userId } = req.auth();
+
+        console.log("USER ID:", userId);
         const {prompt , length}= req.body
-        const plan = req.plan
-        const free_usage = req.free_usage
+        // const plan = req.plan
+        // const free_usage = req.free_usage
 
-
-        const response = await AI.chat.completions.create({
-            model : "gemini-3.7-flash",
-            messages: [
-                {
-                    role: "user",
-                    content: prompt,
-                },
-            ],
+        console.log("Calling Gemini...");
+        const response = await AI.interactions.create({
+            model : "gemini-3.5-flash-lite",
+            input : prompt
         });
 
-        const content = response.choices[0].message.content 
+        console.log("Gemini response received");
+
+        const content = response.output_text 
 
         await sql`INSERT INTO creations (user_id,prompt,content,type) 
         VALUES(${userId},${prompt},${content},'article')`;
@@ -48,26 +50,27 @@ export const generateArticle = async (req,res)=>{
 
 export const generateBlogTitle = async (req,res)=>{
     try{
-        const {userId} = req.auth()
-        const {prompt }= req.body
-        const plan = req.plan
-        const free_usage = req.free_usage
+        console.log("GENERATE ARTICLE CONTROLLER REACHED");
 
+        const { userId } = req.auth();
 
-        const response = await AI.chat.completions.create({
-            model : "gemini-3.7-flash",
-            messages: [
-                {
-                    role: "user",
-                    content: prompt,
-                },
-            ],
+        console.log("USER ID:", userId);
+        const {prompt , length}= req.body
+        // const plan = req.plan
+        // const free_usage = req.free_usage
+
+        console.log("Calling Gemini...");
+        const response = await AI.interactions.create({
+            model : "gemini-3.5-flash-lite",
+            input : prompt
         });
 
-        const content = response.choices[0].message.content 
+        console.log("Gemini response received");
+
+        const content = response.output_text 
 
         await sql`INSERT INTO creations (user_id,prompt,content,type) 
-        VALUES(${userId},${prompt},${content},'BlogTitle')`;
+        VALUES(${userId},${prompt},${content},'article')`;
 
 
         res.json({success:true , content})
@@ -99,7 +102,7 @@ export const generateImage = async (req,res)=>{
         })
 
         const base64Image = `data:image/png;base64,${Buffer.from(data).
-            toString('base64Image')
+            toString('base64')
         }`
         
         const {secure_url} = await cloudinary.uploader.upload(base64Image)

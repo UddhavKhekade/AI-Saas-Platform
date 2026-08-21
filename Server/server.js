@@ -14,7 +14,7 @@ app.use(cors())
 app.use(express.json())
 app.use(clerkMiddleware())
 
-app.get('/',(req,res)=>res.send('Server is live!'))
+app.get('/',(req,res)=>res.send('MY CURRENT SERVER'))
 app.use(requireAuth())
 app.use('/api/ai',aiRouter)
 
