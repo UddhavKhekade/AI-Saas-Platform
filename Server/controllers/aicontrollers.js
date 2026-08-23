@@ -1,9 +1,13 @@
 
-import { OpenAI } from "openai/client.js"
 import { GoogleGenAI } from "@google/genai";
 import sql from "../configs/db.js"
 import {v2 as cloudinary} from 'cloudinary'
+import { InferenceClient } from "@huggingface/inference";
 import axios from 'axios'
+import connectCloudinary from "../configs/cloudianry.js";
+import fs from 'fs'
+import {PDFParse} from 'pdf-parse'
+
 
 const AI = new GoogleGenAI({
     apiKey : process.env.GEMINI_API_KEY,
@@ -82,53 +86,175 @@ export const generateBlogTitle = async (req,res)=>{
     }
 }
 
-export const generateImage = async (req,res)=>{
-    try{
+
+
+
+export const generateImage = async (req, res) => {
+    try {
+        const { prompt , publish } = req.body;
         const {userId} = req.auth()
-        const {prompt ,publish}= req.body
-        const plan = req.plan
-       
 
-        const formData = new FormData()
-        formData.append('prompt', prompt)
+        // 1. Generate image using Hugging Face
+        const client = new InferenceClient(
+            process.env.HUGGING_FACE_API_KEY
+        );
 
-        
-        const {data} = await axios.post("https://clipdrop-api.co/text-to-image/v1",formData,{
-          
-            headers: {
-            'x-api-key': process.env.CLIPDROP_API_KEY,
-            },
-            responseType : "arraybuffer",
-        })
+        const imageBlob = await client.textToImage({
+            provider: "nscale",
+            model: "black-forest-labs/FLUX.1-schnell",
+            inputs: prompt
+        });
 
-        const base64Image = `data:image/png;base64,${Buffer.from(data).
-            toString('base64')
-        }`
-        
-        const {secure_url} = await cloudinary.uploader.upload(base64Image)
+        console.log("Hugging Face image generated");
+
+        // 2. Convert Blob → Buffer
+        const buffer = Buffer.from(
+            await imageBlob.arrayBuffer()
+        );
+
+        console.log("Image converted to Buffer");
+
+        // 3. Upload Buffer → Cloudinary
+        const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    resource_type: "image"
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(result);
+                    }
+                }
+            );
+
+            uploadStream.end(buffer);
+        });
+
+        const secure_url = result.secure_url
+        console.log("Cloudinary URL:", result.secure_url);
 
         await sql`INSERT INTO creations (user_id,prompt,content,type,publish) 
         VALUES(${userId},${prompt},${secure_url},'Image',${publish ?? false})`;
 
 
-        res.json({success:true ,content: secure_url})
-        
-    }catch(error){
-       console.log("STATUS:", error.response?.status);
+        // 4. Send URL to frontend
+        res.json({
+            success: true,
+            content: result.secure_url
+        });
 
-        if (error.response?.data) {
-            console.log(
-                "DATA:",
-                Buffer.from(error.response.data).toString("utf8")
-            );
-        }
-
-        console.log("MESSAGE:", error.message);
+    } catch (error) {
+        console.log("ERROR:", error);
 
         res.json({
             success: false,
             message: error.message
         });
-
     }
-}
+
+
+    
+};
+
+
+export const removeImageBackground = async (req,res)=>{
+    try{
+        const {userId} = req.auth()
+        
+        const {image} = req.file;
+
+        const {secure_url} = await cloudinary.uploader.upload(image.path , {
+            transformation :[
+                {
+                    effect : 'background_removal',
+                    background_removal : 'remove_the_background'
+                }
+            ]
+        })
+
+        await sql`INSERT INTO creations (user_id,prompt,content,type,publish) 
+        VALUES(${userId},'remove background from image',${secure_url},'Image',${publish ?? false})`;
+
+        res.json({success : true , content : secure_url})
+    }catch(error){
+        console.log(error.message)
+        res.json({success : false , message : error.message})
+    }
+        
+};
+
+export const removeImageObject = async (req,res)=>{
+    try{
+        const {userId} = req.auth()
+        const {object} = req.body
+        const {image} = req.file;
+
+        const {public_id} = await cloudinary.uploader.upload(image.path )
+
+        const imageUrl =  cloudinary.url(public_id , {
+            transformation : [{effect:`gen_remove:${object}`}],
+            resource_type : 'image'
+
+        })
+
+
+        await sql`INSERT INTO creations (user_id,prompt,content,type) 
+        VALUES(${userId},${`Removed ${object} from image`},${imageUrl},'Image')`;
+
+        res.json({success : true , content : imageUrl})
+    }catch(error){
+        console.log(error.message)
+        res.json({success : false , message : error.message})
+    }
+        
+};
+
+
+export const resumeReview = async (req,res)=>{
+    try{
+        const {userId} = req.auth()
+       
+        const resume= req.file;
+
+        
+
+        if(resume.size > 5 * 1024 * 1024){
+            return res.json({success:true ,
+                message : "Resume file size exceeds 5MB size"
+            })
+        }
+
+       const dataBuffer = fs.readFileSync(resume.path)
+
+        const parser = new PDFParse({ data: dataBuffer })
+        const result = await parser.getText()
+
+        const pdfText = result.text
+
+        await parser.destroy()
+
+        const prompt = `Review the following resume and provide constructive 
+        feedback on its strenghts, weakness and areas for improvement. Resume 
+        Content :\n\n${pdfText}`
+
+        const response = await AI.interactions.create({
+            model : "gemini-3.5-flash-lite",
+            input : prompt
+        });
+
+
+        const content = response.output_text 
+
+
+        await sql`INSERT INTO creations (user_id,prompt,content,type) 
+        VALUES(${userId},'Review the uploaded resume',${content},'Resume Review')`;
+
+        res.json({success : true , content })
+    }catch(error){
+        console.log(error.message)
+        res.json({success : false , message : error.message})
+    }
+        
+};
