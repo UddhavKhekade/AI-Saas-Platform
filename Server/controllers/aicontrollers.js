@@ -162,10 +162,12 @@ export const generateImage = async (req, res) => {
 export const removeImageBackground = async (req,res)=>{
     try{
         const {userId} = req.auth()
-        
-        const {image} = req.file;
 
-        const {secure_url} = await cloudinary.uploader.upload(image.path , {
+        if (!req.file) {
+            return res.json({success: false, message: 'Please upload an image'})
+        }
+
+        const {secure_url} = await cloudinary.uploader.upload(req.file.path , {
             transformation :[
                 {
                     effect : 'background_removal',
@@ -175,7 +177,7 @@ export const removeImageBackground = async (req,res)=>{
         })
 
         await sql`INSERT INTO creations (user_id,prompt,content,type,publish) 
-        VALUES(${userId},'remove background from image',${secure_url},'Image',${publish ?? false})`;
+        VALUES(${userId},'remove background from image',${secure_url},'Image',false)`;
 
         res.json({success : true , content : secure_url})
     }catch(error){
@@ -188,8 +190,12 @@ export const removeImageBackground = async (req,res)=>{
 export const removeImageObject = async (req,res)=>{
     try{
         const {userId} = req.auth()
-        const {object} = req.body
-        const {image} = req.file;
+        const {object} = req.body ?? {}
+        const image = req.file
+
+        if (!image || !object) {
+            return res.json({success: false, message: 'Please upload an image and specify an object'})
+        }
 
         const {public_id} = await cloudinary.uploader.upload(image.path )
 

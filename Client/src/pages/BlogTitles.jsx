@@ -9,7 +9,7 @@ axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
 
 const BlogTitles = () => {
   const blogCategories = [
-      'General' , 'Teechnology' , 'Business' , 'Health' , 'Lifrstyle' , 'Education' , 'Travel' , 'Food'
+      'General' , 'Teechnology' , 'Business' , 'Health' , 'Lifestyle' , 'Education' , 'Travel' , 'Food'
     ]
   
   const [selectedCategory , setSelectedCategory] = useState('General')

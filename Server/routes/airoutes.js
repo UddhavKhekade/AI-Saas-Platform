@@ -14,7 +14,7 @@ aiRouter.post('/generate-image', generateImage)
 
 aiRouter.post('/remove-image-background',upload.single('image') ,removeImageBackground)
 
-aiRouter.post('/remove-image-object', removeImageObject)
+aiRouter.post('/remove-image-object', upload.single('image'), removeImageObject)
 
 aiRouter.post('/resume-review',upload.single('resume'), resumeReview)
 
