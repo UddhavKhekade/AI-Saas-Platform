@@ -6,7 +6,8 @@ import { InferenceClient } from "@huggingface/inference";
 import axios from 'axios'
 import connectCloudinary from "../configs/cloudianry.js";
 import fs from 'fs'
-import {PDFParse} from 'pdf-parse'
+import { CanvasFactory } from "pdf-parse/worker";
+import { PDFParse } from "pdf-parse";
 
 
 const AI = new GoogleGenAI({
@@ -234,7 +235,10 @@ export const resumeReview = async (req,res)=>{
 
        const dataBuffer = fs.readFileSync(resume.path)
 
-        const parser = new PDFParse({ data: dataBuffer })
+        const parser = new PDFParse({
+            data: dataBuffer,
+            CanvasFactory
+        })
         const result = await parser.getText()
 
         const pdfText = result.text
